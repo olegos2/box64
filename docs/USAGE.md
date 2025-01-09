@@ -307,6 +307,11 @@ Do not load vulkan libraries.
  * 0 : Load vulkan libraries if found. (default)
  * 1 : Disables loading of vulkan libraries, both native and x86_64. (can be useful on Pi4, where the vulkan driver is not quite there yet.)
 
+#### BOX64_ARG0
+Define argv[0] of the executable.
+ * yyyy
+Will rewrite argv[0] instead of using program path.
+
 ----
 
 ### DynaRec optimizations
@@ -363,8 +368,8 @@ Generate x86 -NAN.
 #### BOX64_DYNAREC_FASTROUND *
 
 Generate precise x86 rounding.
- * 0 : Generate float/double -> int rounding like on x86.
- * 1 : Do not do anything special with edge case Rounding, to go as fast as possible (no INF/NAN/Overflow -> MIN_INT conversion). (default, faster)
+ * 0 : Generate float/double -> int rounding and use current rounding mode for float/double computation like on x86.
+ * 1 : Do not do anything special with edge case Rounding, to go as fast as possible (no INF/NAN/Overflow -> MIN_INT conversion, and no non-default rounding modes). (default, faster)
  * 2 : Everything from 1 plus also fast round of double->float (not taking into account current rounding mode).
 
 #### BOX64_DYNAREC_SAFEFLAGS *

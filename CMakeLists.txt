@@ -899,6 +899,7 @@ if(ARM_DYNAREC)
         ${DYNAREC_SRC}
 
         "${BOX64_ROOT}/src/dynarec/arm64/dynarec_arm64_functions.c"
+        "${BOX64_ROOT}/src/dynarec/arm64/dynarec_arm64_arch.c"
         "${BOX64_ROOT}/src/dynarec/arm64/arm64_immenc.c"
         "${BOX64_ROOT}/src/dynarec/arm64/arm64_printer.c"
         "${BOX64_ROOT}/src/dynarec/arm64/dynarec_arm64_jmpnext.c"
@@ -1495,6 +1496,17 @@ add_test(avx_intrinsics ${CMAKE_COMMAND} -D TEST_PROGRAM=${CMAKE_BINARY_DIR}/${B
     -P ${CMAKE_SOURCE_DIR}/runTest.cmake )
 
 set_tests_properties(avx_intrinsics PROPERTIES ENVIRONMENT "BOX64_DYNAREC_FASTNAN=0;BOX64_DYNAREC_FASTROUND=0;BOX64_AVX=2")
+
+add_test(fpu_rounding ${CMAKE_COMMAND} -D TEST_PROGRAM=${CMAKE_BINARY_DIR}/${BOX64}
+    -D TEST_ARGS=${CMAKE_SOURCE_DIR}/tests/test31 -D TEST_OUTPUT=tmpfile31.txt
+    -D TEST_REFERENCE=${CMAKE_SOURCE_DIR}/tests/ref31.txt
+    -P ${CMAKE_SOURCE_DIR}/runTest.cmake )
+
+if(ARM_DYNAREC)
+set_tests_properties(fpu_rounding PROPERTIES ENVIRONMENT "BOX64_DYNAREC_FASTROUND=0;BOX64_DYNAREC_TEST=1")
+else()
+set_tests_properties(fpu_rounding PROPERTIES ENVIRONMENT "BOX64_DYNAREC=0")
+endif()
 
 else()
 

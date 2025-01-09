@@ -258,6 +258,9 @@
         ed = i;                                                                                                                 \
         wb1 = 1;                                                                                                                \
     }
+//Compute wback for MDREG only, no fetching
+#define CALCEW()                                                                                                                \
+    wback = TO_NAT((nextop & 7) + (rex.b << 3));                                                                                \
 //GETEW will use i for ed, and can use r3 for wback.
 #define GETEW(i, D)                                                                                                              \
     if (MODREG) {                                                                                                                \
@@ -322,6 +325,16 @@
 #define EWBACKW(w)   if(wb1) {STH(w, wback, fixedaddress); SMWRITE();} else {BFIx(wback, w, 0, 16);}
 // Write back gd in correct register
 #define GWBACK BFIx(TO_NAT(((nextop & 0x38) >> 3) + (rex.r << 3)), gd, 0, 16);
+// no fetch version of GETEB for MODREG path only
+#define CALCEB()                                                                                             \
+    if (rex.rex) {                                                                                           \
+        wback = TO_NAT((nextop & 7) + (rex.b << 3));                                                         \
+        wb2 = 0;                                                                                             \
+    } else {                                                                                                 \
+        wback = (nextop & 7);                                                                                \
+        wb2 = (wback >> 2) * 8;                                                                              \
+        wback = TO_NAT(wback & 3);                                                                           \
+    }                                                                                                        \
 //GETEB will use i for ed, and can use r3 for wback.
 #define GETEB(i, D)                                                                                              \
     if (MODREG) {                                                                                                \
@@ -410,6 +423,16 @@
     }
 // Write eb (ed) back to original register / memory
 #define EBBACK   if(wb1) {STB(ed, wback, fixedaddress); SMWRITE();} else {BFIx(wback, ed, wb2, 8);}
+// no fetch version of GETGB
+#define CALCGB()                                             \
+    if (rex.rex) {                                           \
+        gb1 = TO_NAT(((nextop & 0x38) >> 3) + (rex.r << 3)); \
+        gb2 = 0;                                             \
+    } else {                                                 \
+        gd = (nextop & 0x38) >> 3;                           \
+        gb2 = ((gd & 4) << 1);                               \
+        gb1 = TO_NAT(gd & 3);                                \
+    }                                                        \
 //GETGB will use i for gd
 #define GETGB(i)                                             \
     if (rex.rex) {                                           \
@@ -916,7 +939,7 @@
 #endif
 
 // Generate FCOM with s1 and s2 scratch regs (the VCMP is already done)
-#define FCOM(s1, s2, s3, s4, v1, v2, is_f)                                  \
+#define FCOM(s1, s2, s3)                                                    \
     LDRH_U12(s3, xEmu, offsetof(x64emu_t, sw));   /*offset is 8bits right?*/\
     MOV32w(s1, 0b0100011100000000);                                         \
     BICw_REG(s3, s3, s1);                                                   \
@@ -926,33 +949,11 @@
     CSELw(s1, s2, s1, cEQ);                                                 \
     MOV32w(s2, 0b01000101); /* unordered */                                 \
     CSELw(s1, s2, s1, cVS);                                                 \
-    if(v1||v2) {                                                            \
-        Bcond(cVS, 10*4);                                                   \
-        if(is_f) {                                                          \
-            ORRw_mask(s4, xZR, 12, 10); /*+inf*/                            \
-            FMOVwS(s2, v1);                                                 \
-            CMPSw_REG(s2, s4);                                              \
-            Bcond(cEQ, 5*4); /* same */                                     \
-            FMOVwS(s2, v2);                                                 \
-            ORRw_mask(s4, s4, 1, 0); /*-inf*/                               \
-            CMPSw_REG(s2, s4);                                              \
-        } else {                                                            \
-            ORRx_mask(s4, xZR, 1, 12, 10); /*+inf*/                         \
-            FMOVxD(s2, v1);                                                 \
-            CMPSx_REG(s2, s4);                                              \
-            Bcond(cEQ, 5*4); /* same */                                     \
-            FMOVxD(s2, v2);                                                 \
-            ORRx_mask(s4, s4, 1, 1, 0); /*-inf*/                            \
-            CMPSx_REG(s2, s4);                                              \
-        }                                                                   \
-        Bcond(cNE, 4+4); /* same */                                         \
-        MOVZw(s2, 0);                                                       \
-    }                                                                       \
     ORRw_REG_LSL(s3, s3, s1, 8);                                            \
     STRH_U12(s3, xEmu, offsetof(x64emu_t, sw))
 
 // Generate FCOMI with s1 and s2 scratch regs (the VCMP is already done)
-#define FCOMI(s1, s2, s4, v1, v2, is_f)                                     \
+#define FCOMI(s1, s2)                                                       \
     IFX(X_OF|X_AF|X_SF|X_PEND) {                                            \
         MOV32w(s2, 0b100011010101);                                         \
         BICw_REG(xFlags, xFlags, s2);                                       \
@@ -972,28 +973,6 @@
         MOV32w(s2, 0b01000000); /* zero */                                  \
         CSELw(s1, s2, s1, cEQ);                                             \
         /* greater than leave 0 */                                          \
-        if(s4) {                                                            \
-            Bcond(cVS, 10*4);                                               \
-            if(is_f) {                                                      \
-                ORRw_mask(s4, xZR, 12, 10); /*+inf*/                        \
-                FMOVwS(s2, v1);                                             \
-                CMPSw_REG(s2, s4);                                          \
-                Bcond(cEQ, 5*4); /* same */                                 \
-                FMOVwS(s2, v2);                                             \
-                ORRw_mask(s4, s4, 1, 0); /*-inf*/                           \
-                CMPSw_REG(s2, s4);                                          \
-            } else {                                                        \
-                ORRx_mask(s4, xZR, 1, 12, 10); /*+inf*/                     \
-                FMOVxD(s2, v1);                                             \
-                CMPSx_REG(s2, s4);                                          \
-                Bcond(cEQ, 5*4); /* same */                                 \
-                FMOVxD(s2, v2);                                             \
-                ORRx_mask(s4, s4, 1, 1, 0); /*-inf*/                        \
-                CMPSx_REG(s2, s4);                                          \
-            }                                                               \
-            Bcond(cNE, 4+4); /* same */                                     \
-            MOVZw(s1, 0);                                                   \
-        }                                                                   \
         ORRw_REG(xFlags, xFlags, s1);                                       \
     }                                                                       \
     SET_DFNONE(s1);                                                         \
@@ -1169,6 +1148,7 @@
 #define UFLAG_RES(A) if(dyn->insts[ninst].x64.gen_flags) {STRxw_U12(A, xEmu, offsetof(x64emu_t, res));}
 #define UFLAG_DF(r, A) if(dyn->insts[ninst].x64.gen_flags) {SET_DF(r, A)}
 #define UFLAG_IF if(dyn->insts[ninst].x64.gen_flags)
+#define UFLAG_IF2(A) if(dyn->insts[ninst].x64.gen_flags A)
 #ifndef DEFAULT
 #define DEFAULT      *ok = -1; BARRIER(2)
 #endif

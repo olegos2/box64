@@ -1324,7 +1324,11 @@ GOWD(modfl, DFDp, modf)
 //GOW(modify_ldt, 
 //GOW(moncontrol, 
 //GO(__monstartup, 
-//GOW(monstartup, 
+#ifdef STATICBUILD
+//GOW(monstartup, vFLL)
+#else
+GOW(monstartup, vFLL)
+#endif
 //DATA(__morecore, 
 GOW(mount, iFpppLp)
 GO(mprobe, iFp)
@@ -2555,7 +2559,7 @@ GOM(wscanf, iFEpV)
 //GOM(xdr_double, iFpp)
 //GOM(xdr_enum, iFpp)
 //GOM(xdr_float, iFpp)
-//GOM(xdr_free, vFpp)
+GO(xdr_free, vFpp)
 //GOM(xdr_getcredres, iFpp)
 //GOM(xdr_hyper, iFpp)
 //GOM(xdr_int, iFpp)
@@ -2590,7 +2594,7 @@ GOM(wscanf, iFEpV)
 //GOM(xdr_short, iFpp)
 //GOM(xdr_sizeof, LFpp)
 //GOM(xdrstdio_create, vFpSu)
-//GOM(xdr_string, iFppu)
+GO(xdr_string, iFppu)
 //GOM(xdr_u_char, iFpp)
 //GOM(xdr_u_hyper, iFpp)
 //GOM(xdr_u_int, iFpp)

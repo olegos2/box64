@@ -209,6 +209,7 @@ int convert_bitmask(uint64_t bitmask);
 #define SUBx_REG_LSL(Rd, Rn, Rm, lsl)       EMIT(ADDSUB_REG_gen(1, 1, 0, 0b00, Rm, lsl, Rn, Rd))
 #define SUBw_REG(Rd, Rn, Rm)                EMIT(ADDSUB_REG_gen(0, 1, 0, 0b00, Rm, 0, Rn, Rd))
 #define SUBw_REG_LSL(Rd, Rn, Rm, lsl)       EMIT(ADDSUB_REG_gen(0, 1, 0, 0b00, Rm, lsl, Rn, Rd))
+#define SUBw_REG_ASR(Rd, Rn, Rm, asr)       EMIT(ADDSUB_REG_gen(0, 1, 0, 0b10, Rm, asr, Rn, Rd))
 #define SUBSw_REG(Rd, Rn, Rm)              FEMIT(ADDSUB_REG_gen(0, 1, 1, 0b00, Rm, 0, Rn, Rd))
 #define SUBSw_REG_LSL(Rd, Rn, Rm, lsl)     FEMIT(ADDSUB_REG_gen(0, 1, 1, 0b00, Rm, lsl, Rn, Rd))
 #define SUBSw_REG_LSR(Rd, Rn, Rm, lsr)     FEMIT(ADDSUB_REG_gen(0, 1, 1, 0b01, Rm, lsr, Rn, Rd))
@@ -1149,7 +1150,9 @@ int convert_bitmask(uint64_t bitmask);
 #define VFMOVDQ_8(Vd, u8)                   EMIT(FMOV_vector_imm(1, 1, ((u8)>>5)&0b111, (u8)&0b11111, Vd))
 
 #define FMOV_scalar_imm(type, imm8, Rd)     (0b11110<<24 | (type)<<22 | 1<<21 | (imm8)<<13 | 0b100<<10 | (Rd))
+// FMOV to Sd, imm=7 :~6:6:6:6:6:6:5:4 :3:2:1:0....
 #define FMOVS_8(Sd, u8)                     EMIT(FMOV_scalar_imm(0b00, u8, Sd))
+// FMOV to Dd, imm=7 :~6:6:6:6:6:6:6:6:6:5:4 :3:2:1:0....
 #define FMOVD_8(Dd, u8)                     EMIT(FMOV_scalar_imm(0b01, u8, Dd))
 
 // VMOV
@@ -1305,7 +1308,7 @@ int convert_bitmask(uint64_t bitmask);
 #define VFRSQRTSQS(Vd, Vn, Vm)      EMIT(FRSQRTS_vector(1, 0, Vm, Vn, Vd))
 #define VFRSQRTSQD(Vd, Vn, Vm)      EMIT(FRSQRTS_vector(1, 0, Vm, Vn, Vd))
 
-// CMP
+// CMP . NZCV: unordere=0011, eq=0110, inf=1000, sup=0010
 #define FCMP_scalar(type, Rn, Rm, opc)  (0b11110<<24 | (type)<<22 | 1<<21 | (Rm)<<16 | 0b1000<<10 | (Rn)<<5 | (opc)<<3)
 #define FCMPS(Sn, Sm)              FEMIT(FCMP_scalar(0b00, Sn, Sm, 0b00))
 #define FCMPD(Dn, Dm)              FEMIT(FCMP_scalar(0b01, Dn, Dm, 0b00))
@@ -1834,7 +1837,7 @@ int convert_bitmask(uint64_t bitmask);
 #define FCMLTS_0(Rd, Rn)             EMIT(FCMP_0_scalar(0, 0, 0b10, (Rn), (Rd)))
 #define FCMLTD_0(Rd, Rn)             EMIT(FCMP_0_scalar(0, 1, 0b10, (Rn), (Rd)))
 
-// Scalar Float CMP
+// Scalar Float CMEQ
 #define FCMP_op_scalar(U, E, sz, Rm, ac, Rn, Rd)    (0b01<<30 | (U)<<29 | 0b11110<<24 | (E)<<23 | (sz)<<22 | 1<<21 | (Rm)<<16 | 0b1110<<12 | (ac)<<11 | 1<<10 | (Rn)<<5 | (Rd))
 #define FCMEQS(Rd, Rn, Rm)          EMIT(FCMP_op_scalar(0, 0, 0, (Rm), 0, (Rn), (Rd)))
 #define FCMEQD(Rd, Rn, Rm)          EMIT(FCMP_op_scalar(0, 0, 1, (Rm), 0, (Rn), (Rd)))

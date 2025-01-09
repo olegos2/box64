@@ -312,7 +312,7 @@ uintptr_t dynarec64_660F(dynarec_arm_t* dyn, uintptr_t addr, uintptr_t ip, int n
             GETGX(v0, 0);
             GETEXSD(q0, 0, 0);
             FCMPD(v0, q0);
-            FCOMI(x1, x2, 0, v0, q0, 0);    //disable precise cmp
+            FCOMI(x1, x2);
             break;
 
         case 0x38:  // SSSE3 opcodes
@@ -924,13 +924,27 @@ uintptr_t dynarec64_660F(dynarec_arm_t* dyn, uintptr_t addr, uintptr_t ip, int n
                     SETFLAGS(X_CF, SF_SUBSET);
                     GETED(0);
                     GETGD;
-                    MRS_nzcv(x3);
-                    BFIx(x3, xFlags, 29, 1); // set C
-                    MSR_nzcv(x3);      // load CC into ARM CF
+                    IFNATIVE_BEFORE(NF_CF) {
+                        if(INVERTED_CARRY_BEFORE) {
+                            if(arm64_flagm)
+                                CFINV();
+                            else {
+                                MRS_nzcv(x3);
+                                EORx_mask(x3, x3, 1, 35, 0);  //mask=1<<NZCV_C
+                                MSR_nzcv(x3);
+                            }
+                        }
+                    } else {
+                        MRS_nzcv(x3);
+                        BFIx(x3, xFlags, 29, 1); // set C
+                        MSR_nzcv(x3);      // load CC into ARM CF
+                    }
                     IFX(X_CF) {
                         ADCSxw_REG(gd, gd, ed);
-                        CSETw(x3, cCS);
-                        BFIw(xFlags, x3, F_CF, 1);
+                        IFNATIVE(NF_CF) {} else {
+                            CSETw(x3, cCS);
+                            BFIw(xFlags, x3, F_CF, 1);
+                        }
                     } else {
                         ADCxw_REG(gd, gd, ed);
                     }
@@ -2441,7 +2455,37 @@ uintptr_t dynarec64_660F(dynarec_arm_t* dyn, uintptr_t addr, uintptr_t ip, int n
             emit_shrd16(dyn, ninst, ed, gd, x4, x5, x6);
             EWBACK;
             break;
-
+        case 0xAE:
+            nextop = F8;
+            if(MODREG)
+                switch (nextop) {
+                    default:
+                        DEFAULT;
+                }
+            else
+                switch((nextop>>3)&7) {
+                    case 6:
+                        INST_NAME("CLWB Ed");
+                        MESSAGE(LOG_DUMP, "Need Optimization?\n");
+                        addr = geted(dyn, addr, ninst, nextop, &ed, x1, &fixedaddress, NULL, 0, 0, rex, NULL, 0, 0);
+                        if(ed!=x1) {
+                            MOVx_REG(x1, ed);
+                        }
+                        CALL_(native_clflush, -1, 0);
+                        break;
+                    case 7:
+                        INST_NAME("CLFLUSHOPT Ed");
+                        MESSAGE(LOG_DUMP, "Need Optimization?\n");
+                        addr = geted(dyn, addr, ninst, nextop, &ed, x1, &fixedaddress, NULL, 0, 0, rex, NULL, 0, 0);
+                        if(ed!=x1) {
+                            MOVx_REG(x1, ed);
+                        }
+                        CALL_(native_clflush, -1, 0);
+                        break;
+                    default:
+                        DEFAULT;
+                }
+            break;
         case 0xAF:
             INST_NAME("IMUL Gw,Ew");
             SETFLAGS(X_ALL, SF_SET);
@@ -2951,20 +2995,17 @@ uintptr_t dynarec64_660F(dynarec_arm_t* dyn, uintptr_t addr, uintptr_t ip, int n
             q1 = fpu_get_scratch(dyn, ninst);
             GETEX(q0, 0, 0);
             GETGD;
-            TABLE64(x1, (uintptr_t)&mask_shift8);
-            VLDR64_U12(v0, x1, 0);     // load shift
-            MOVI_8(v1, 0x80);   // load mask
-            VAND(q1, v1, q0);
-            USHL_8(q1, q1, v0); // shift
-            UADDLV_8(q1, q1);   // accumalte
-            VMOVBto(gd, q1, 0);
+            TABLE64(x2, 0x0706050403020100LL);
+            VDUPQD(v0, x2);
+            VSHRQ_8(q1, q0, 7);
+            USHLQ_8(q1, q1, v0); // shift
+            UADDLV_8(v1, q1);   // accumalte
+            VMOVBto(gd, v1, 0);
             // and now the high part
-            VMOVeD(q1, 0, q0, 1);
-            VAND(q1, v1, q1);  // keep highest bit
-            USHL_8(q1, q1, v0); // shift
+            VMOVeD(q1, 0, q1, 1);
             UADDLV_8(q1, q1);   // accumalte
-            VMOVBto(x1, q1, 0);
-            BFIx(gd, x1, 8, 8);
+            VMOVBto(x2, q1, 0);
+            BFIw(gd, x2, 8, 8);
             break;
         case 0xD8:
             INST_NAME("PSUBUSB Gx, Ex");

@@ -847,7 +847,7 @@ void LoadLogEnv()
                 box64_dynarec_fastround = p[0]-'0';
         }
         if(!box64_dynarec_fastround)
-            printf_log(LOG_INFO, "Dynarec will try to generate x86 precise IEEE->int rounding\n");
+            printf_log(LOG_INFO, "Dynarec will try to generate x86 precise IEEE->int rounding and and set rounding mode for computation\n");
         else if(box64_dynarec_fastround==2)
             printf_log(LOG_INFO, "Dynarec will generate x86 very imprecise double->float rounding\n");
     }
@@ -925,7 +925,7 @@ void LoadLogEnv()
                 box64_dynarec_perf_map = p[0] - '0';
         }
         if (box64_dynarec_perf_map)
-            printf_log(LOG_INFO, "Dynarec will generate map file for Linux perf tool\n");
+            printf_log(LOG_INFO, "Dynarec will generate map file /tmp/perf-%d.map for Linux perf tool\n", getpid());
     }
     p = getenv("BOX64_DYNAREC_DF");
     if(p) {
@@ -989,10 +989,10 @@ void LoadLogEnv()
             }
             if(box64_dynarec_test_end>box64_dynarec_test_start) {
                 box64_dynarec_test = 1;
-                printf_log(LOG_INFO, "Dynarec test in the range %p - %p\n", (void*)box64_nodynarec_start, (void*)box64_nodynarec_end);
+                printf_log(LOG_INFO, "Dynarec test in the range %p - %p\n", (void*)box64_dynarec_test_start, (void*)box64_dynarec_test_end);
             } else {
                 box64_dynarec_test = 0;
-                printf_log(LOG_INFO, "Ignoring BOX64_NODYNAREC=%s (%p-%p)\n", p, (void*)box64_nodynarec_start, (void*)box64_nodynarec_end);
+                printf_log(LOG_INFO, "Ignoring BOX64_NODYNAREC=%s (%p-%p)\n", p, (void*)box64_dynarec_test_start, (void*)box64_dynarec_test_end);
             }
         }
 
@@ -2142,9 +2142,14 @@ int initialize(int argc, const char **argv, char** env, x64emu_t** emulator, elf
     {
         my_context->box86path = box_strdup(my_context->box64path);
         #ifndef BOX32
-        char* p = strrchr(my_context->box86path, '6');  // get the 6 of box64
-        p[0] = '8'; p[1] = '6'; // change 64 to 86
-        if(!FileExist(my_context->box86path, IS_FILE)) {
+        if(strstr(my_context->box86path, "box64")) {
+            char* p = strrchr(my_context->box86path, '6');  // get the 6 of box64
+            p[0] = '8'; p[1] = '6'; // change 64 to 86
+        } else {
+            box_free(my_context->box86path);
+            my_context->box86path = ResolveFileSoft("box86", &my_context->box64_path);
+        }
+        if(my_context->box86path && !FileExist(my_context->box86path, IS_FILE)) {
             box_free(my_context->box86path);
             my_context->box86path = NULL;
         }
